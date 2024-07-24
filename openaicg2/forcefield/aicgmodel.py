@@ -244,38 +244,6 @@ class AICG2Model(SimulationSystem):
         force = functionterms.flex_dihd_term(flp_dihd_idx_params,force_group=force_group)
         self.system.addForce(force)
 
-    def identify_nat_con_type(self,hbond_residx_l=14,hbond_residx_h=42):
-        """
-        Identify orientation-dependent hydrogen bonds and regular native contacts.
-        """
-        num_atom_per_chain = len(list(self.chains[0].atoms()))
-        num_res_per_chain = len(list(self.chains[0].residues()))
-        if hasattr(self, 'protein_inter_contact'):
-            inter_contact = self.protein_inter_contact.copy()
-            contact_idx_go = []
-            contact_idx_go_params = []
-            contact_idx_hb = []
-            contact_idx_hb_params = []
-            for row in inter_contact.itertuples():
-                a1 = row.a1
-                a2 = row.a2
-                residx1 = self.atoms[a1].residue.index
-                residx2 = self.atoms[a2].residue.index
-                if self.atoms[a1].name == "CB" and self.atoms[a2].name == "CB":
-                    contact_idx_go.append([row.a1,row.a2])
-                    contact_idx_go_params.append([row.epsilon,row.sigma])
-                elif self.atoms[a1].name == "CA" and self.atoms[a2].name == "CA" and residx1%num_res_per_chain>=hbond_residx_l and residx1%num_res_per_chain<=hbond_residx_h:
-                    contact_idx_hb.append([row.a1,row.a2])
-                    contact_idx_hb_params.append([row.epsilon,row.sigma])
-                else:
-                    contact_idx_go.append([row.a1,row.a2])
-                    contact_idx_go_params.append([row.epsilon,row.sigma])
-            contact_idx_hb = pd.DataFrame(np.array(contact_idx_hb).astype(np.int64),columns=['a1','a2'])
-            contact_idx_hb_params = pd.DataFrame(np.array(contact_idx_hb_params).astype(np.float64),columns=['epsilon','sigma'])
-            contact_idx_go = pd.DataFrame(np.array(contact_idx_go).astype(np.int64),columns=['a1','a2'])
-            contact_idx_go_params = pd.DataFrame(np.array(contact_idx_go_params).astype(np.float64),columns=['epsilon','sigma'])
-            self.oriented_Hbond = pd.concat([contact_idx_hb,contact_idx_hb_params],axis=1)
-            self.protein_inter_contact = pd.concat([contact_idx_go,contact_idx_go_params],axis=1)
 
     def add_protein_native_pair(self,cutoff=2.5,force_group=8):
         """
@@ -301,55 +269,7 @@ class AICG2Model(SimulationSystem):
             force = functionterms.go_contact_term(protein_nat_con,self.use_pbc,cutoff,force_group)
             self.system.addForce(force)
 
-    def add_oriented_Hbond(self,cutoff=2.5,force_group=9,residx_l=14,residx_h=41):
-        """
-        Add oriented-dependent Hydrogen bond for backbone and CA at C terminal
 
-        Parameters
-        ----------
-        cutoff: float
-            cutoff = truncated distance / rest length  
-        force_group: int
-            Force group.
-        """
-        num_atom_per_chain = len(list(self.chains[0].atoms()))
-        num_res_per_chain = len(list(self.chains[0].residues()))
-        all_ca_indices = [ai.index for ai in self.atoms if ai.name=='CA']
-        if hasattr(self,'oriented_Hbond'):
-            print('Add oriented-dependent Hydrogen bond')
-            oriented_Hbond = self.oriented_Hbond.copy()
-            hbond_idx = []
-            hbond_params = []
-            for row in oriented_Hbond.itertuples():
-                a1 = row.a1
-                a2 = row.a2  
-                idx_a1 = all_ca_indices.index(a1) 
-                idx_a2 = all_ca_indices.index(a2)
-                res_idx1 = self.atoms[a1].residue.index
-                res_idx2 = self.atoms[a2].residue.index 
-                if res_idx1%num_res_per_chain <residx_l and res_idx2%num_res_per_chain > residx_h:
-                    continue
-                if a1 % num_atom_per_chain == num_atom_per_chain -2 and a2 % num_atom_per_chain == num_atom_per_chain -2 :
-                    ihb_idx = [all_ca_indices[idx_a1-1],all_ca_indices[idx_a1-2],a1,
-                               all_ca_indices[idx_a2-1],all_ca_indices[idx_a2-2],a2,a1,a2]
-                   # print('hres:',ihb_idx)
-                elif self.atoms[a1].residue.index % num_res_per_chain == residx_l:
-                    ihb_idx =  [a1,all_ca_indices[idx_a1+1],all_ca_indices[idx_a1+2],
-                                a2,all_ca_indices[idx_a2+1],all_ca_indices[idx_a2+2],a1,a2]
-                else:
-
-                    ihb_idx = [all_ca_indices[idx_a1-1],a1,all_ca_indices[idx_a1+1],# donor index
-                                all_ca_indices[idx_a2-1],a2,all_ca_indices[idx_a2+1],a1,a2] # acceptor index
-                        
-                hbond_idx.append(ihb_idx)
-                hbond_params.append([row.epsilon,row.sigma])
-            hbond_idx = np.array(hbond_idx).astype(np.int64)
-            hbond_params = np.array(hbond_params).astype(np.float64)
-            pd_hbond_idx = pd.DataFrame(hbond_idx,columns=['a1','a2','a3','a4','a5','a6','a7','a8'])
-            pd_hbond_params = pd.DataFrame(hbond_params,columns=['epsilon','sigma'])
-            hbond_contact = pd.concat([pd_hbond_idx,pd_hbond_params],axis=1)
-            force = functionterms.oriented_dependent_Hbond_term(hbond_contact,self.use_pbc,cutoff,force_group)
-            self.system.addForce(force)
 
     def add_kim_hummer(self,path=f'{__location__}/para/kh.para',kh_model_symbol='D',T=300,kh_epsilon_scale=1.3,cutoff=2.5, rad_scale = 0.85,force_group=10):
         """
@@ -387,12 +307,7 @@ class AICG2Model(SimulationSystem):
         sigma_KH = sigma_KH * rad_scale
         atom_resi_types = []
         for ai in self.atoms:
-            if ai.name == "CB" and self.cgmodel_type == "two-bead":
-                atom_resi_types.append(resi_type[ai.residue.name])
-            elif ai.name == "CA" and self.cgmodel_type == "two-bead":
-                atom_resi_types.append(num_type_resi)
-            elif ai.name == "CA" and self.cgmodel_type == "one-bead":
-                atom_resi_types.append(resi_type[ai.residue.name])
+            atom_resi_types.append(resi_type[ai.residue.name])
 
         if hasattr(self,'extraexclusions'):
             extraexclusions = self.extraexclusions
@@ -419,30 +334,18 @@ class AICG2Model(SimulationSystem):
         """
         print('Add excluded force')
         atom_type = []
-        if self.cgmodel_type == "one-bead":
-            exv_params = utils.parser_exv_params(f'{__location__}/para/exv.para')
-            numbeadtype = len(exv_params.keys()) - 2
-            keys = list(exv_params.keys())
-            epsilon_map = np.zeros((numbeadtype,numbeadtype),dtype=float)
-            sigma_map = np.zeros((numbeadtype,numbeadtype),dtype=float)
-            epsilon_map[:] = exv_params['exv_coef']
-            for i in range(numbeadtype):
-                for j in range(numbeadtype):
-                    sigma_map[i,j] = (exv_params[keys[i]] + exv_params[keys[j]])/2
-            for ai in self.atoms:
-                atom_type.append(keys.index(ai.residue.name))   
-        elif self.cgmodel_type == "two-bead":
-            num_type_atom_ex = 2
-            epsilon_map = np.zeros((num_type_atom_ex,num_type_atom_ex),dtype=float)
-            sigma_map = np.zeros((num_type_atom_ex,num_type_atom_ex),dtype=float)
-            epsilon_map[0,:] = epsilon * _kcal_to_kj
-            epsilon_map[1,0] = epsilon * _kcal_to_kj
-            sigma_map[:] = sigma * _A_to_nm
-            for ai in self.atoms:
-                if ai.name == 'CA':
-                    atom_type.append(0)
-                elif ai.name == 'CB' and self.cgmodel_type == "two-bead":
-                    atom_type.append(0) 
+        exv_params = utils.parser_exv_params(f'{__location__}/para/exv.para')
+        numbeadtype = len(exv_params.keys()) - 2
+        keys = list(exv_params.keys())
+        epsilon_map = np.zeros((numbeadtype,numbeadtype),dtype=float)
+        sigma_map = np.zeros((numbeadtype,numbeadtype),dtype=float)
+        epsilon_map[:] = exv_params['exv_coef']
+        for i in range(numbeadtype):
+            for j in range(numbeadtype):
+                sigma_map[i,j] = (exv_params[keys[i]] + exv_params[keys[j]])/2
+        for ai in self.atoms:
+            atom_type.append(keys.index(ai.residue.name))   
+
         if hasattr(self,'extraexclusions'):
             extraexclusions = self.extraexclusions
         else:
@@ -453,78 +356,6 @@ class AICG2Model(SimulationSystem):
                                             cutoff=cutoff,force_group=force_group)
         self.system.addForce(force)
    
-    def add_kim_hummer_and_excluded(self,path=f'{__location__}/para/kh.para',kh_model_symbol="D",T=300,kh_epsilon_scale=1.3,epsilon_ex=0.2,sigma_ex=3.8,cutoff_kh=2.5,cutoff_ex=2.0,rad_scale=0.85,force_group=12):
-        """
-        Add kim hummer potential between CB and CB which there is no native contact and excluded volume potential for those atom pair CA-CA and CA-CB
-
-        Parameters
-        ----------
-        path: str
-            The path of kim-hummer parameters file.
-
-        kh_model_symbol: str    
-            The parameters represent symbols of the Kim-Hummer parameters model. The model consists of
-            six types: A, B, C, D, E, and F. Specific numerical values are referenced from "Journal 
-            of Molecular Biology, 2008, 375(5): 1416-1433."
-
-        T: float
-            Temperature
-
-        kh_epsilon_scale: float
-            The parameter scale the size of kim-hummer epsilon.
-
-        epsilon_ex: float, kcal/mol
-            The strength of excluded volume potential.
-
-        sigma_ex: float, angstrom
-            The rest length of excluded volume potential.
-
-        cutoff_kh: float
-            cutoff = truncated distance / rest lengt. The cutoff of kim hummer potential.
-
-        cutoff_ex: float
-            cutoff = truncated distance / rest lengt. The cutoff of excluded volume potential.
-        
-        rad_scale: float
-            scaling factor to radii(sigma) and default value is 0.85
-        
-        force_group: int
-            Force group.
-
-        """
-        print('Add a kim hummer and excluded combined potential energy function')
-        num_atom_type = 2
-        sigma_ex = sigma_ex * _A_to_nm
-        atom_type_map = np.zeros((2,2),dtype=int)
-        atom_type_map[0,:] = 1
-        atom_type_map[1,0] = 1
-        resi_type,epsilon_map,sigma_map = utils.parser_kh_params(path, kh_model_symbol,kh_epsilon_scale,T)
-        res_sigma = sigma_map.diagonal().copy()
-        res_sigma[20] = sigma_ex
-        epsilon_map[-1,:] = epsilon_ex * _kcal_to_kj
-        epsilon_map[:,-1] = epsilon_ex * _kcal_to_kj
-        sigma_map[:,-1] = (sigma_ex + res_sigma)/2
-        sigma_map[-1,:] = (sigma_ex + res_sigma)/2
-        num_resi_type = len(resi_type.keys())
-        resi_type_seq = []
-        atom_type_seq = []
-        for ai in self.atoms:
-            if ai.name == "CB" and self.cgmodel_type == "two-bead":
-                resi_type_seq.append(resi_type[ai.residue.name])
-                atom_type_seq.append(1)
-            elif ai.name == "CA" and self.cgmodel_type == "two-bead":
-                resi_type_seq.append(num_resi_type)
-                atom_type_seq.append(0)
-        if hasattr(self,'extraexclusions'):
-            extraexclusions = self.extraexclusions
-        else:
-            extraexclusions = None  
-        sigma_map = sigma_map*rad_scale
-        force = functionterms.kh_and_ex_term(resi_type_seq,atom_type_seq,epsilon_map,sigma_map,atom_type_map,
-                                                     self.exclusions,extraexclusions,use_pbc=self.use_pbc,
-                                                     cutoff_kh=cutoff_kh, cutoff_ex=cutoff_ex,
-                                                     force_group=force_group)
-        self.system.addForce(force)
 
     def add_debye_huckel(self,dieletric_constant=80,ion_strength=0.02,temperature=300,extra_charged_atom=None,cutoff=20,force_group=13):
         """
@@ -568,7 +399,7 @@ class AICG2Model(SimulationSystem):
         ----------
         oriented_Hbond: bool
             Whether to add orientation-dependent hydrogen bond between CA atoms for force field. 
-            If False, the hydrogen would not apply to force field.  
+            If False, the hydrogen would not apply to f  rce field.  
         
         cutoff_hbond: float
             cutoff_hbond = truncated distance / rest length
@@ -593,17 +424,11 @@ class AICG2Model(SimulationSystem):
         self.add_protein_native_dihedral(force_group=5)
         self.add_protein_aicg_dihedral(force_group=6)
         self.add_flexible_loc_dihedral(force_group=7)
-        if hasattr(self,'protein_inter_contact') and oriented_Hbond:
-            self.identify_nat_con_type()
-            self.add_oriented_Hbond(force_group=8) # cutoff=cutoffhbond,
         self.add_protein_native_pair(force_group=9) # cutoff=cutoffgo
         self.get_exclusion(exclude_nat_con=True)
-        if self.cgmodel_type == "one-bead":
-           self.add_kim_hummer(cutoff=cutoff_kh,force_group=10)
-        elif self.cgmodel_type == "two-bead":
-            #self.add_kim_hummer(cutoff=cutoff_kh,kh_epsilon_scale=kh_epsilon_scale,force_group=10)
-            #self.add_excluded(cutoff=cutoff_exv,force_group=11)
-            self.add_kim_hummer_and_excluded(kh_epsilon_scale=kh_epsilon_scale,cutoff_kh=cutoff_kh,cutoff_ex=cutoff_exv,force_group=10) #
+        self.add_kim_hummer(cutoff=cutoff_kh,force_group=10)
+        self.add_kim_hummer(cutoff=cutoff_kh,kh_epsilon_scale=kh_epsilon_scale,force_group=10)
+        self.add_excluded(cutoff=cutoff_exv,force_group=11)
         atoms_per_chain = list(self.chains[0].atoms())
         terminal_charge = []
         for i in range(len(self.chains)):
