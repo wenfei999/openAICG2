@@ -1,0 +1,7 @@
+#BSUB -q gpu_v100
+#BSUB -gpu "num=1"
+#BSUB -n 5
+#BSUB -J g007
+#BSUB -o ../output/out_007
+#BSUB -e ../output/err_007
+python amyloid_beta42.py ../output/monomer_007.json

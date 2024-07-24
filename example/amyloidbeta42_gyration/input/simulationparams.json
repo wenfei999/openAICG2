@@ -1,0 +1,27 @@
+{
+"queue":"gpu_v100",
+"num_compute_card":1,
+"num_cpu_to_gpu":5,
+
+"num_traj":8,
+"num_of_monomer":1,
+
+"cutoff_kh": 2.8,
+"k_go_scale":1,
+"lambdakh_scale":1.30,
+
+"Temperature": 300,
+"friction": 1,
+"timestep": 35,
+"report_period":20000,
+"total_mdsteps":100000000,
+"platform_type":"CUDA",
+"box_vector": {"x":300,"y":300,"z":300},
+
+"output_file_name":"monomer",
+"report_traj_format":"dcd",
+"monomer_psf": "../input/monomer.psf",
+"initial_pdb": "../input/monomer.pdb",
+"native_information":"../input/2nao_9chain_l1p0_1p02p2_cb2p2_full_def_0_to_openmm.info" 
+}
+
