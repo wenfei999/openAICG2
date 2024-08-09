@@ -427,7 +427,6 @@ class AICG2Model(SimulationSystem):
         self.add_protein_native_pair(force_group=9) # cutoff=cutoffgo
         self.get_exclusion(exclude_nat_con=True)
         self.add_kim_hummer(cutoff=cutoff_kh,force_group=10)
-        self.add_kim_hummer(cutoff=cutoff_kh,kh_epsilon_scale=kh_epsilon_scale,force_group=10)
         self.add_excluded(cutoff=cutoff_exv,force_group=11)
         atoms_per_chain = list(self.chains[0].atoms())
         terminal_charge = []
